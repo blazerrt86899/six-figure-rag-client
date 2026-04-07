@@ -4,7 +4,7 @@ import { CreateProjectModal } from '@/components/projects/CreateProjectModal'
 import { ProjectsGrid } from '@/components/projects/ProjectsGrid'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { apiClient } from '@/lib/api'
-import { Project } from '@/lib/types'
+import { Project } from '@/lib/types/index'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -64,7 +64,7 @@ function ProjectsPage() {
                 description
             }, token);
 
-            const savedProject = result?.data || {}
+            const savedProject = result?.data?.[0] || result?.data
             setProjects((prev) => [savedProject, ...prev])
 
             setShowCreateModal(false);
@@ -115,7 +115,7 @@ function ProjectsPage() {
 
     const filteredProjects = projects.filter(
         (project) =>
-            project.name.toLowerCase().includes(searchQuery.toLowerCase()) || project.description?.toLowerCase().includes(searchQuery.toLowerCase())
+            project.name?.toLowerCase().includes(searchQuery.toLowerCase()) || project.description?.toLowerCase().includes(searchQuery.toLowerCase())
     )
 
     if (loading) {
