@@ -64,5 +64,38 @@ export const apiClient = {
         }
 
         return response.json()
+    },
+    put: async (endpoint: string, data: any, token?: string | null) => {
+        const headers: HeadersInit = {
+            "Content-Type": "application/json"
+        };
+
+        if (token) {
+            headers["Authorization"] = `Bearer ${token}`
+        }
+
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+            method: "PUT",
+            headers,
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status}`)
+        }
+
+        return response.json()
+    },
+    uploadToS3: async (url: string, file: File) => {
+        const response = await fetch(url, {
+            method: "PUT",
+            body: file,
+            headers: { "Content-Type": file.type },
+
+        });
+        if (!response.ok) {
+            throw new Error(`S3 Upload Error: ${response.status}`)
+        }
+        return response;
     }
 }

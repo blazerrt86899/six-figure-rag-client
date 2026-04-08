@@ -132,30 +132,140 @@ function ProjectPage({ params }: ProjectPageprops) {
     }
 
     // Document related methods
-    const handleDocumentUpload = async (file: File[]) => {
-        console.log("Document Upload")
+    const handleDocumentUpload = async (files: File[]) => {
+        if (!userId) return;
+
+        const token = await getToken();
+        const uploadedDocuments: ProjectDocument[] = [];
+
+        const uploadPromise = files.map(async (file) => {
+            console.log("File:", file);
+            try {
+                const uploadData = await apiClient.post(`/api/projects/${projectId}/files/upload-url`, {
+                    filename: file.name,
+                    file_size: file.size,
+                    file_type: file.type
+                }, token)
+
+                const { upload_url, s3_key } = uploadData.data;
+
+                await apiClient.uploadToS3(upload_url, file);
+
+                const confirm_result = await apiClient.post(`/api/projects/${projectId}/files/confirm`, {
+                    s3_key: s3_key
+                }, token);
+
+                if (confirm_result.data) {
+                    toast.success("File upload confirm. Queued for celery to process..")
+                }
+
+                uploadedDocuments.push(confirm_result.data)
+
+            } catch (error) {
+                toast.error(`Failed to upload ${file.name}`)
+
+            }
+        });
+
+        await Promise.allSettled(uploadPromise);
+
+        // Update local state with successfully uploaded document
+        setData((prev) => ({
+            ...prev,
+            documents: [...uploadedDocuments, ...prev.documents]
+        }))
+
+        toast.success(`${uploadedDocuments.length} file(s) uploaded.`)
+
     }
 
     const handleDocumentDelete = async (documentId: string) => {
-        console.log("Document deleted with id: ", documentId)
+        if (!userId) return;
+
+        try {
+            const token = await getToken();
+            await apiClient.delete(`/api/projects/${projectId}/files/${documentId}`, token);
+
+            setData((prev) => ({
+                ...prev,
+                documents: prev.documents.filter((doc) => doc.id != documentId),
+            }))
+
+            toast.success("Document deleted successfully");
+
+
+
+        } catch (error) {
+            toast.error("Document deletion failed");
+        }
+
     }
 
-    const handleAddUrl = (url: string) => {
-        console.log("Add URL: ", url)
+    const handleAddUrl = async (url: string) => {
+        if (!userId) return;
+
+        try {
+            const token = await getToken();
+
+            const result = await apiClient.post(`/api/projects/${projectId}/urls`, {
+                url: url
+            }, token);
+
+            const newDocument = result.data;
+
+            setData((prev) => ({
+                ...prev,
+                documents: [newDocument, ...prev.documents]
+            }))
+            toast.success("Successfully added url")
+
+        } catch (error) {
+            toast.error("Failed to add website url")
+        }
     }
 
     const handleOpenDocument = (documentId: string) => {
-        console.log("Open Document", documentId)
         setSelectedDocumentId(documentId);
     }
 
     // Project Settings Method
     const handleDraftSettings = (updates: any) => {
-        console.log("Update local state with draft settings", updates)
+        setData((prev) => {
+            if (!prev.settings) {
+                console.warn("Cannot update settings: not loaded yet.")
+                return prev;
+            }
+
+            return {
+                ...prev,
+                settings: {
+                    ...prev.settings,
+                    ...updates
+                }
+            }
+        })
     }
 
     const handlePublishSettings = async () => {
-        console.log("Make API call for publishing settings")
+        if (!userId || !data.settings) {
+            toast.error("Cannot save settings!")
+        }
+
+        try {
+            const token = await getToken();
+
+            const result = await apiClient.put(`/api/projects/${projectId}/settings`, data.settings, token);
+
+            setData((prev) => ({
+                ...prev,
+                settings: result.data
+            }));
+
+            toast.success("Settings saved successfully!")
+        } catch (error) {
+            toast.error("Failed to save settings")
+        }
+
     }
 
     const selectedDocument = selectedDocumentId ? data.documents.find((doc) => doc.id === selectedDocumentId) : null
